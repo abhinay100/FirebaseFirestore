@@ -22,10 +22,7 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         btnUploadData.setOnClickListener {
-            val firstName = etFirstName.text.toString()
-            val lastName = etLastName.text.toString()
-            val age = etAge.text.toString().toInt()
-            val person = Person(firstName, lastName, age)
+            val person = getOldPerson()
             savePerson(person)
         }
 
@@ -34,6 +31,68 @@ class MainActivity : AppCompatActivity() {
         btnRetrieveData.setOnClickListener {
             retrievePersons()
         }
+
+        btnUpdatePerson.setOnClickListener {
+            val oldPerson = getOldPerson()
+            val newPersonMap = getNewPersonMap()
+            updatePerson(oldPerson, newPersonMap)
+        }
+    }
+
+    private fun getOldPerson(): Person {
+        val firstName = etFirstName.text.toString()
+        val lastName = etLastName.text.toString()
+        val age = etAge.text.toString().toInt()
+        return  Person(firstName, lastName, age)
+    }
+
+    private fun getNewPersonMap(): Map<String, Any> {
+        val firstName = etNewFirstName.text.toString()
+        val lastName = etNewLastName.text.toString()
+        val age = etAge.text.toString()
+
+        val map = mutableMapOf<String, Any>()
+        if(firstName.isNotEmpty()) {
+            map["firstName"] = firstName
+        }
+        if(lastName.isNotEmpty()) {
+            map["lastName"] = lastName
+        }
+        if(age.isNotEmpty()) {
+            map["age"] = age.toInt()
+        }
+        return map
+    }
+
+    private fun updatePerson(person: Person, newPersomMap: Map<String, Any>) = CoroutineScope(Dispatchers.IO).launch {
+
+        val personQuery = personCollectionRef
+            .whereEqualTo("firstName", person.firstName)
+            .whereEqualTo("lastName", person.lastName)
+            .whereEqualTo("age", person.age)
+            .get()
+            .await()
+
+        if(personQuery.documents.isNotEmpty()) {
+            for(document in personQuery) {
+                try {
+                    personCollectionRef.document(document.id).set(
+                        newPersomMap,
+                        SetOptions.merge()
+                    ).await()
+                }catch (e: Exception) {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(this@MainActivity, e.message, Toast.LENGTH_LONG).show()
+                    }
+                }
+            }
+
+        }else {
+            withContext(Dispatchers.Main) {
+                Toast.makeText(this@MainActivity, "No Person Matched the query", Toast.LENGTH_LONG).show()
+            }
+        }
+
     }
 
     private fun subscribeToRealTimeUpdates() {
